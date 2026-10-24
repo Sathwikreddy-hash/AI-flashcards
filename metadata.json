@@ -1,0 +1,6 @@
+{
+  "name": "AI-Powered YouTube Flashcard Study App",
+  "description": "Transform any public YouTube video into interactive 3D flashcards using Google Gemini AI with progress tracking and smooth animations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
