@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, RotateCw, CheckCircle, AlertCircle, HelpCircle, Check, Eye } from 'lucide-react';
+import { Volume2, VolumeX, RotateCw, CheckCircle, AlertCircle, HelpCircle, Check, Eye, MessageSquareQuote } from 'lucide-react';
 import { Flashcard, VideoMetadata } from '../types';
 
 interface FlashcardContainerProps {
@@ -10,6 +10,7 @@ interface FlashcardContainerProps {
   onFlip: () => void;
   onToggleMastery: (cardId: number) => void;
   video?: VideoMetadata;
+  userPrompt?: string;
 }
 
 export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
@@ -20,6 +21,7 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
   onFlip,
   onToggleMastery,
   video,
+  userPrompt,
 }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
@@ -75,8 +77,23 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
         </div>
       </div>
 
+      {/* Active User Prompt Banner if specified */}
+      {userPrompt && (
+        <div className="mb-3 px-4 py-2.5 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 border border-indigo-700/60 rounded-xl text-xs flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <MessageSquareQuote className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="text-slate-300 truncate">
+              <span className="font-bold text-indigo-300">Prompt Focus:</span> "{userPrompt}"
+            </span>
+          </div>
+          <span className="text-[10px] text-indigo-300 bg-indigo-900/60 border border-indigo-600/40 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider shrink-0">
+            Active Prompt
+          </span>
+        </div>
+      )}
+
       {/* Video Context Tag if available */}
-      {video && (
+      {video && video.title && (
         <div className="mb-4 flex items-center justify-between gap-3 px-3.5 py-2 bg-slate-900/60 border border-slate-800/80 rounded-xl text-xs text-slate-400">
           <div className="flex items-center gap-2.5 truncate">
             {video.thumbnail && (
@@ -96,7 +113,7 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
       )}
 
       {/* 3D Interactive Flashcard Container */}
-      <div className="card-perspective w-full h-[360px] sm:h-[400px] select-none cursor-pointer" onClick={onFlip}>
+      <div className="card-perspective w-full h-[370px] sm:h-[420px] select-none cursor-pointer" onClick={onFlip}>
         <div className={`card-inner-3d ${isFlipped ? 'card-flipped' : ''}`}>
           
           {/* ================= FRONT OF CARD (Question) ================= */}
@@ -110,9 +127,19 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
                 <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
                   <HelpCircle className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                  Question
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                    Question
+                  </span>
+                  {card.prompt && (
+                    <>
+                      <span className="text-slate-600 text-xs hidden sm:inline">·</span>
+                      <span className="text-xs font-medium text-indigo-200 bg-indigo-900/70 border border-indigo-500/40 px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-sm">
+                        <span className="text-indigo-400 font-bold text-[10px] uppercase">Prompt:</span> {card.prompt}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Action utilities */}
@@ -138,6 +165,12 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
 
             {/* Front Content / Question */}
             <div className="my-auto py-4 text-center sm:text-left">
+              {card.prompt && (
+                <div className="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-950/80 border border-indigo-700/60 text-xs font-medium text-indigo-300">
+                  <span className="text-indigo-400 font-semibold">Prompt Topic:</span>
+                  <span className="text-white font-bold">{card.prompt}</span>
+                </div>
+              )}
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight leading-snug sm:leading-relaxed text-balance">
                 {card.question}
               </h2>
@@ -166,9 +199,19 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
                 <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
                   <CheckCircle className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-300">
-                  Answer & Insight
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-purple-300">
+                    Answer & Insight
+                  </span>
+                  {card.prompt && (
+                    <>
+                      <span className="text-slate-600 text-xs hidden sm:inline">·</span>
+                      <span className="text-xs font-medium text-slate-300 bg-purple-950/60 border border-purple-800/60 px-2.5 py-0.5 rounded-lg">
+                        {card.prompt}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Action utilities */}
@@ -215,6 +258,12 @@ export const FlashcardContainer: React.FC<FlashcardContainerProps> = ({
 
             {/* Back Content / Answer */}
             <div className="my-auto py-4">
+              {card.prompt && (
+                <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-purple-950/70 border border-purple-800/50 text-xs font-medium text-purple-300">
+                  <span>Topic:</span>
+                  <span className="text-white font-semibold">{card.prompt}</span>
+                </div>
+              )}
               <div className="text-base sm:text-lg md:text-xl font-medium text-slate-100 leading-relaxed max-w-2xl">
                 {card.answer}
               </div>

@@ -6,7 +6,7 @@ import { DeckNavigation } from './components/DeckNavigation';
 import { DeckCompletion } from './components/DeckCompletion';
 import { DeckOverviewModal } from './components/DeckOverviewModal';
 import { Flashcard, VideoMetadata, FlashcardResponse, SampleVideo } from './types';
-import { Sparkles, Brain, BookOpen, Clock, AlertTriangle, Layers, Zap } from 'lucide-react';
+import { Sparkles, Brain, BookOpen, Clock, AlertTriangle, Layers, Zap, RefreshCw } from 'lucide-react';
 
 const STORAGE_KEY = 'study_tube_active_deck';
 
@@ -21,41 +21,49 @@ const DEFAULT_INITIAL_DATA = {
   cards: [
     {
       id: 1,
+      prompt: "Track Origins & Release",
       question: "Who produced and released the global electronic hit 'Faded', and in what year was it launched?",
       answer: "The track was produced by Norwegian DJ and producer Alan Walker and released in December 2015 as a vocal revamp of his 2014 instrumental track 'Fade'.",
     },
     {
       id: 2,
+      prompt: "Vocal Performance",
       question: "Who provided the uncredited lead vocals for Alan Walker's 'Faded'?",
       answer: "The iconic vocals were performed by Norwegian singer-songwriter Iselin Solheim.",
     },
     {
       id: 3,
+      prompt: "Genre & Musical Production",
       question: "What musical genre, tempo, and signature elements define 'Faded'?",
       answer: "It is an electro house / downtempo EDM track set at ~90 BPM, driven by an emotive solo piano progression overlaid with atmospheric synths and pitch-shifted vocal chops.",
     },
     {
       id: 4,
+      prompt: "Lyrical Meaning & Metaphor",
       question: "What is the central metaphorical theme of the lyrics in 'Faded' ('Where are you now? Was it all in my fantasy?')?",
       answer: "The lyrics evoke feelings of isolation, longing, and searching for lost connections, drawing a poetic parallel to Atlantis disappearing beneath the sea.",
     },
     {
       id: 5,
+      prompt: "Filming Locations",
       question: "Where was the iconic post-apocalyptic music video for 'Faded' filmed?",
       answer: "The music video was filmed on location in Estonia, featuring abandoned Soviet-era industrial ruins including the Linnahall amphitheater, the Rummu submerged prison quarry, and Paldiski.",
     },
     {
       id: 6,
+      prompt: "Narrative & Protagonist",
       question: "What narrative storyline does the protagonist follow in the music video?",
       answer: "A lone masked survivor roams across derelict, abandoned landscapes clutching a faded photo of his former home, ultimately discovering that his past sanctuary lies in total ruin.",
     },
     {
       id: 7,
+      prompt: "Streaming & Global Reach",
       question: "What streaming and chart milestones did 'Faded' achieve?",
       answer: "'Faded' surpassed over 3.5 billion views on YouTube—ranking among the most-watched music videos in history—and achieved multi-platinum certifications across the globe.",
     },
     {
       id: 8,
+      prompt: "Visual Identity & Branding",
       question: "How did Alan Walker establish his signature visual branding around 'Faded'?",
       answer: "He adopted the iconic black hoodie and face mask persona to prioritize anonymity, unity, and the concept that anyone can join the community of 'Walkers'.",
     },
@@ -71,7 +79,8 @@ export default function App() {
   const [video, setVideo] = useState<VideoMetadata | undefined>(DEFAULT_INITIAL_DATA.video);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<'transcript' | 'grounded_synthesis' | 'metadata_synthesis' | null>(DEFAULT_INITIAL_DATA.sourceType);
+  const [activePrompt, setActivePrompt] = useState<string | undefined>('Track Origins, Production & Impact');
+  const [sourceType, setSourceType] = useState<'transcript' | 'grounded_synthesis' | 'metadata_synthesis' | 'prompt_synthesis' | null>(DEFAULT_INITIAL_DATA.sourceType);
   const [isOverviewOpen, setIsOverviewOpen] = useState<boolean>(false);
   const [sampleVideos, setSampleVideos] = useState<SampleVideo[]>([]);
 
@@ -100,6 +109,9 @@ export default function App() {
           setVideo(parsed.video);
           setCurrentIndex(parsed.currentIndex || 0);
           setSourceType(parsed.sourceType || 'transcript');
+          if (parsed.activePrompt) {
+            setActivePrompt(parsed.activePrompt);
+          }
         }
       }
     } catch {
@@ -113,26 +125,46 @@ export default function App() {
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ cards, video, currentIndex, sourceType })
+          JSON.stringify({ cards, video, currentIndex, sourceType, activePrompt })
         );
       } catch {
         // storage quota exceeded or disabled
       }
     }
-  }, [cards, video, currentIndex, sourceType]);
+  }, [cards, video, currentIndex, sourceType, activePrompt]);
+
+  const lastRequestRef = React.useRef<{
+    url: string;
+    cardCount: number;
+    focus: string;
+    manualTranscript?: string;
+    customPrompt?: string;
+  } | null>(null);
 
   // Generate flashcards from API
-  const handleGenerate = async (url: string, cardCount: number, focus: string, manualTranscript?: string) => {
+  const handleGenerate = async (
+    url: string,
+    cardCount: number,
+    focus: string,
+    manualTranscript?: string,
+    customPrompt?: string
+  ) => {
     setIsLoading(true);
     setError(null);
     setIsCompleted(false);
+    lastRequestRef.current = { url, cardCount, focus, manualTranscript, customPrompt };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
       const response = await fetch('/api/generate-flashcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, cardCount, studyFocus: focus, manualTranscript }),
+        body: JSON.stringify({ url, cardCount, studyFocus: focus, manualTranscript, customPrompt }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const data: FlashcardResponse | { error?: string } = await response.json();
 
@@ -145,6 +177,7 @@ export default function App() {
       setCards(res.flashcards);
       setVideo(res.video);
       setSourceType(res.source);
+      setActivePrompt(res.userPrompt || customPrompt?.trim() || undefined);
       setCurrentIndex(0);
       setIsFlipped(false);
       setIsCompleted(false);
@@ -155,10 +188,29 @@ export default function App() {
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 150);
     } catch (err: unknown) {
+      clearTimeout(timeoutId);
       const e = err as Error;
-      setError(e.message || 'An error occurred while analyzing the YouTube video.');
+      if (e.name === 'AbortError') {
+        setError('Generation timed out after 45 seconds. Please click Retry.');
+      } else if (e.message?.includes('Failed to fetch') || e.message?.includes('NetworkError')) {
+        setError('Connection interrupted while contacting the server. Please click Retry.');
+      } else {
+        setError(e.message || 'An error occurred while analyzing the YouTube video.');
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastRequestRef.current) {
+      handleGenerate(
+        lastRequestRef.current.url,
+        lastRequestRef.current.cardCount,
+        lastRequestRef.current.focus,
+        lastRequestRef.current.manualTranscript,
+        lastRequestRef.current.customPrompt
+      );
     }
   };
 
@@ -230,6 +282,7 @@ export default function App() {
   const handleNewVideo = () => {
     setCards([]);
     setVideo(undefined);
+    setActivePrompt(undefined);
     setCurrentIndex(0);
     setIsFlipped(false);
     setIsCompleted(false);
@@ -298,6 +351,7 @@ export default function App() {
             isLoading={isLoading}
             sampleVideos={sampleVideos}
             initialUrl={video?.url}
+            initialPrompt={activePrompt}
           />
         </section>
 
@@ -310,23 +364,37 @@ export default function App() {
                 <h4 className="text-sm font-semibold text-red-300">Generation Error</h4>
                 <p className="text-xs text-red-400/90 mt-0.5">{error}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                className="text-xs text-red-400 hover:text-red-200 font-medium"
-              >
-                Dismiss
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {lastRequestRef.current && (
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-700/60 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Retry</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-xs text-red-400 hover:text-red-200 font-medium px-1 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Source info notice if captions were synthesized via Gemini knowledge grounding */}
+        {/* Source info notice */}
         {sourceType !== 'transcript' && sourceType !== null && cards.length > 0 && (
           <div className="max-w-3xl mx-auto px-4 mt-4">
             <div className="px-3.5 py-2 rounded-xl bg-indigo-950/40 border border-indigo-800/40 text-xs text-indigo-300 flex items-center justify-between">
               <span>
-                Note: Direct YouTube closed captions were restricted or disabled on this video. Flashcards were synthesized from video concept and topic grounding.
+                {sourceType === 'prompt_synthesis'
+                  ? '✨ Flashcards generated directly from your custom prompt.'
+                  : 'Note: Direct YouTube closed captions were restricted or disabled on this video. Flashcards were synthesized from video concept and topic grounding.'}
               </span>
             </div>
           </div>
@@ -343,6 +411,7 @@ export default function App() {
               onFlip={handleFlip}
               onToggleMastery={handleToggleMastery}
               video={video}
+              userPrompt={activePrompt}
             />
 
             <DeckNavigation

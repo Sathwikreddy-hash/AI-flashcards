@@ -85,9 +85,16 @@ export const DeckOverviewModal: React.FC<DeckOverviewModalProps> = ({
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-mono font-semibold text-indigo-400">
-                      Card #{originalIndex + 1}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono font-semibold text-indigo-400">
+                        Card #{originalIndex + 1}
+                      </span>
+                      {card.prompt && (
+                        <span className="text-[10px] text-slate-300 bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 rounded-md">
+                          {card.prompt}
+                        </span>
+                      )}
+                    </div>
                     {card.mastered ? (
                       <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50">
                         <Check className="w-2.5 h-2.5" /> Mastered
